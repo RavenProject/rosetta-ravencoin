@@ -24,13 +24,15 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
 	"github.com/RavenProject/rosetta-ravencoin/configuration"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/wire"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/RavenProject/rosetta-ravencoin/ravenutil"
+
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/btcec"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/txscript"
+
 	"github.com/coinbase/rosetta-sdk-go/parser"
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -71,9 +73,9 @@ func (s *ConstructionAPIService) ConstructionDerive(
 	ctx context.Context,
 	request *types.ConstructionDeriveRequest,
 ) (*types.ConstructionDeriveResponse, *types.Error) {
-	addr, err := btcutil.NewAddressWitnessPubKeyHash(
-		btcutil.Hash160(request.PublicKey.Bytes),
-		nil,//s.config.Params,
+	addr, err := ravenutil.NewAddressPubKeyHash(
+		ravenutil.Hash160(request.PublicKey.Bytes),
+		s.config.Params,
 	)
 	if err != nil {
 		return nil, wrapErr(ErrUnableToDerive, err)
@@ -95,15 +97,15 @@ func (s *ConstructionAPIService) estimateSize(operations []*types.Operation) flo
 			size += ravencoin.InputSize
 		case ravencoin.OutputOpType:
 			size += ravencoin.OutputOverhead
-			addr, err := btcutil.DecodeAddress(operation.Account.Address, nil)//s.config.Params)
+			addr, err := ravenutil.DecodeAddress(operation.Account.Address, s.config.Params)
 			if err != nil {
-				size += ravencoin.P2PKHScriptPubkeySize
+				size += ravencoin.P2PKHReplayScriptPubkeySize
 				continue
 			}
-
-			script, err := txscript.PayToAddrScript(addr)
+			hashReplay, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000000")
+			script, err := txscript.PayToAddrReplayOutScript(addr, hashReplay, 100)
 			if err != nil {
-				size += ravencoin.P2PKHScriptPubkeySize
+				size += ravencoin.P2PKHReplayScriptPubkeySize
 				continue
 			}
 
@@ -209,7 +211,14 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 		return nil, wrapErr(ErrScriptPubKeysMissing, err)
 	}
 
-	metadata, err := types.MarshalMap(&constructionMetadata{ScriptPubKeys: scripts})
+	// Determine the blockhash for the replay protection
+	bestblockHash, err := s.client.GetBestBlock(ctx)
+	if err != nil {
+		return nil, wrapErr(ErrCouldNotGetBestBlock, err)
+	}
+	hashReplay, err := s.client.GetHashFromIndex(ctx, bestblockHash-100)
+
+	metadata, err := types.MarshalMap(&constructionMetadata{ScriptPubKeys: scripts, ReplayBlockHeight: bestblockHash - 100, ReplayBlockHash: hashReplay})
 	if err != nil {
 		return nil, wrapErr(ErrUnableToParseIntermediateResult, err)
 	}
@@ -260,6 +269,10 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	if err != nil {
 		return nil, wrapErr(ErrUnclearIntent, err)
 	}
+	var metadata constructionMetadata
+	if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
+		return nil, wrapErr(ErrUnableToParseIntermediateResult, err)
+	}
 
 	tx := wire.NewMsgTx(wire.TxVersion)
 	for _, input := range matches[0].Operations {
@@ -283,7 +296,7 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	}
 
 	for i, output := range matches[1].Operations {
-		addr, err := btcutil.DecodeAddress(output.Account.Address, nil)//s.config.Params)
+		addr, err := ravenutil.DecodeAddress(output.Account.Address, s.config.Params)
 		if err != nil {
 			return nil, wrapErr(ErrUnableToDecodeAddress, fmt.Errorf(
 				"%w unable to decode address %s",
@@ -294,6 +307,11 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		}
 
 		pkScript, err := txscript.PayToAddrScript(addr)
+
+		//Original: PayToReplayOut
+		//hashReplayToByte, err := hex.DecodeString(metadata.ReplayBlockHash)
+		//pkScript, err := txscript.PayToAddrReplayOutScript(addr, hashReplayToByte, metadata.ReplayBlockHeight)
+
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToDecodeAddress,
@@ -312,10 +330,6 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	inputAmounts := make([]string, len(tx.TxIn))
 	inputAddresses := make([]string, len(tx.TxIn))
 	payloads := make([]*types.SigningPayload, len(tx.TxIn))
-	var metadata constructionMetadata
-	if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
-		return nil, wrapErr(ErrUnableToParseIntermediateResult, err)
-	}
 
 	for i := range tx.TxIn {
 		address := matches[0].Operations[i].Account.Address
@@ -323,8 +337,7 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		if err != nil {
 			return nil, wrapErr(ErrUnableToDecodeScriptPubKey, err)
 		}
-
-		class, _, err := ravencoin.ParseSingleAddress(nil /*s.config.Params*/, script)
+		class, _, err := ravencoin.ParseSingleAddress(s.config.Params, script)
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToDecodeAddress,
@@ -334,35 +347,31 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 
 		inputAddresses[i] = address
 		inputAmounts[i] = matches[0].Amounts[i].String()
-		absAmount := new(big.Int).Abs(matches[0].Amounts[i]).Int64()
 
-		switch class {
-		case txscript.WitnessV0PubKeyHashTy:
-			hash, err := txscript.CalcWitnessSigHash(
-				script,
-				txscript.NewTxSigHashes(tx),
-				txscript.SigHashAll,
-				tx,
-				i,
-				absAmount,
-			)
-			if err != nil {
-				return nil, wrapErr(ErrUnableToCalculateSignatureHash, err)
-			}
-
-			payloads[i] = &types.SigningPayload{
-				AccountIdentifier: &types.AccountIdentifier{
-					Address: address,
-				},
-				Bytes:         hash,
-				SignatureType: types.Ecdsa,
-			}
-		default:
+		if class != txscript.PubKeyHashTy {
 			return nil, wrapErr(
 				ErrUnsupportedScriptType,
 				fmt.Errorf("unupported script type: %s", class),
 			)
 		}
+		hash, err := txscript.CalcSignatureHash(
+			script,
+			txscript.SigHashAll,
+			tx,
+			i,
+		)
+		if err != nil {
+			return nil, wrapErr(ErrUnableToCalculateSignatureHash, err)
+		}
+
+		payloads[i] = &types.SigningPayload{
+			AccountIdentifier: &types.AccountIdentifier{
+				Address: address,
+			},
+			Bytes:         hash,
+			SignatureType: types.Ecdsa,
+		}
+
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
@@ -379,7 +388,6 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	if err != nil {
 		return nil, wrapErr(ErrUnableToParseIntermediateResult, err)
 	}
-
 	return &types.ConstructionPayloadsResponse{
 		UnsignedTransaction: hex.EncodeToString(rawTx),
 		Payloads:            payloads,
@@ -439,7 +447,7 @@ func (s *ConstructionAPIService) ConstructionCombine(
 			return nil, wrapErr(ErrUnableToDecodeScriptPubKey, err)
 		}
 
-		class, _, err := ravencoin.ParseSingleAddress(nil /*s.config.Params*/, decodedScript)
+		class, _, err := ravencoin.ParseSingleAddress(s.config.Params, decodedScript)
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToDecodeAddress,
@@ -447,17 +455,19 @@ func (s *ConstructionAPIService) ConstructionCombine(
 			)
 		}
 
-		pkData := request.Signatures[i].PublicKey.Bytes
 		fullsig := normalizeSignature(request.Signatures[i].Bytes)
+		pkData := request.Signatures[i].PublicKey.Bytes
 
-		switch class {
-		case txscript.WitnessV0PubKeyHashTy:
-			tx.TxIn[i].Witness = wire.TxWitness{fullsig, pkData}
-		default:
+		if class != txscript.PubKeyHashTy {
 			return nil, wrapErr(
 				ErrUnsupportedScriptType,
 				fmt.Errorf("unupported script type: %s", class),
 			)
+		}
+
+		tx.TxIn[i].SignatureScript, err = txscript.NewScriptBuilder().AddData(fullsig).AddData(pkData).Script()
+		if err != nil {
+			return nil, wrapErr(ErrUnableToParseIntermediateResult, fmt.Errorf("%w calculate input signature", err))
 		}
 	}
 
@@ -494,7 +504,6 @@ func (s *ConstructionAPIService) ConstructionHash(
 			fmt.Errorf("%w signed transaction cannot be decoded", err),
 		)
 	}
-
 	var signed signedTransaction
 	if err := json.Unmarshal(decodedTx, &signed); err != nil {
 		return nil, wrapErr(
@@ -502,7 +511,6 @@ func (s *ConstructionAPIService) ConstructionHash(
 			fmt.Errorf("%w unable to unmarshal signed ravencoin transaction", err),
 		)
 	}
-
 	bytesTx, err := hex.DecodeString(signed.Transaction)
 	if err != nil {
 		return nil, wrapErr(
@@ -511,7 +519,7 @@ func (s *ConstructionAPIService) ConstructionHash(
 		)
 	}
 
-	tx, err := btcutil.NewTxFromBytes(bytesTx)
+	tx, err := ravenutil.NewTxFromBytes(bytesTx)
 	if err != nil {
 		return nil, wrapErr(
 			ErrUnableToParseIntermediateResult,
@@ -592,7 +600,7 @@ func (s *ConstructionAPIService) parseUnsignedTransaction(
 
 	for i, output := range tx.TxOut {
 		networkIndex := int64(i)
-		_, addr, err := ravencoin.ParseSingleAddress(nil /*s.config.Params*/, output.PkScript)
+		_, addr, err := ravencoin.ParseSingleAddress(s.config.Params, output.PkScript)
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToDecodeAddress,
@@ -660,15 +668,14 @@ func (s *ConstructionAPIService) parseSignedTransaction(
 	ops := []*types.Operation{}
 	signers := []*types.AccountIdentifier{}
 	for i, input := range tx.TxIn {
-		pkScript, err := txscript.ComputePkScript(input.SignatureScript, input.Witness)
+		pkScript, err := txscript.ComputePkScript(input.SignatureScript)
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToComputePkScript,
 				fmt.Errorf("%w: unable to compute pk script", err),
 			)
 		}
-
-		_, addr, err := ravencoin.ParseSingleAddress(nil /*s.config.Params*/, pkScript.Script())
+		_, addr, err := ravencoin.ParseSingleAddress(s.config.Params, pkScript.Script())
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToDecodeAddress,
@@ -708,7 +715,7 @@ func (s *ConstructionAPIService) parseSignedTransaction(
 
 	for i, output := range tx.TxOut {
 		networkIndex := int64(i)
-		_, addr, err := ravencoin.ParseSingleAddress(nil /*s.config.Params*/, output.PkScript)
+		_, addr, err := ravencoin.ParseSingleAddress(s.config.Params, output.PkScript)
 		if err != nil {
 			return nil, wrapErr(
 				ErrUnableToDecodeAddress,

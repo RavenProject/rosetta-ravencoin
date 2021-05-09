@@ -18,14 +18,13 @@ import (
 	"context"
 
 	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
-
 	"github.com/coinbase/rosetta-sdk-go/types"
 )
 
 const (
 	// NodeVersion is the version of
 	// ravencoin core we are using.
-	NodeVersion = "0.20.1"
+	NodeVersion = "4.3.2.1"
 
 	// HistoricalBalanceLookup indicates
 	// that historical balance lookup is supported.
@@ -55,6 +54,8 @@ type Client interface {
 	SendRawTransaction(context.Context, string) (string, error)
 	SuggestedFeeRate(context.Context, int64) (float64, error)
 	RawMempool(context.Context) ([]string, error)
+	GetBestBlock(context.Context) (int64, error)
+	GetHashFromIndex(context.Context, int64) (string, error)
 }
 
 // Indexer is used by the servicers to get block and account data.
@@ -85,10 +86,10 @@ type Indexer interface {
 }
 
 type unsignedTransaction struct {
-	Transaction    string                  `json:"transaction"`
+	Transaction    string                    `json:"transaction"`
 	ScriptPubKeys  []*ravencoin.ScriptPubKey `json:"scriptPubKeys"`
-	InputAmounts   []string                `json:"input_amounts"`
-	InputAddresses []string                `json:"input_addresses"`
+	InputAmounts   []string                  `json:"input_amounts"`
+	InputAddresses []string                  `json:"input_addresses"`
 }
 
 type preprocessOptions struct {
@@ -98,7 +99,9 @@ type preprocessOptions struct {
 }
 
 type constructionMetadata struct {
-	ScriptPubKeys []*ravencoin.ScriptPubKey `json:"script_pub_keys"`
+	ScriptPubKeys     []*ravencoin.ScriptPubKey `json:"script_pub_keys"`
+	ReplayBlockHeight int64                     `json:"replay_block_height"`
+	ReplayBlockHash   string                    `json:"replay_block_hash"`
 }
 
 type signedTransaction struct {

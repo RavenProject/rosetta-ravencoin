@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
 	"github.com/RavenProject/rosetta-ravencoin/configuration"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
 	"github.com/RavenProject/rosetta-ravencoin/services"
 	"github.com/RavenProject/rosetta-ravencoin/utils"
 
@@ -293,7 +293,7 @@ func (i *Indexer) Sync(ctx context.Context) error {
 		i,
 		i,
 		i.cancel,
-		syncer.WithCacheSize(syncer.DefaultCacheSize),
+		syncer.WithCacheSize(syncer.LargeCacheSize), // try LargeCacheSize instead of DefaultCacheSize
 		syncer.WithSizeMultiplier(sizeMultiplier),
 		syncer.WithPastBlocks(pastBlocks),
 	)

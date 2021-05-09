@@ -17,7 +17,7 @@ request_funds(1){
     loaded_account = find_balance({
       "account_identifier": {{random_account.account_identifier}},
       "minimum_balance":{
-        "value": "1000000",
+        "value": "1000000000",
         "currency": {{currency}}
       },
       "require_coin":true
@@ -27,7 +27,7 @@ request_funds(1){
 
 create_account(1){
   create{
-    network = {"network":"Testnet3", "blockchain":"Bitcoin"};
+    network = {"network":"Testnet7", "blockchain":"Ravencoin"};
     key = generate_key({"curve_type": "secp256k1"});
     account = derive({
       "network_identifier": {{network}},
@@ -39,23 +39,29 @@ create_account(1){
       "account_identifier": {{account.account_identifier}},
       "keypair": {{key}}
     });
+
+    // print key pair
+    print_message({
+      "private_key": {{key.private_key}},
+      "address": {{account.account_identifier.address}}
+    });
   }
 }
 
 transfer(10){
   transfer_dry_run{
-    transfer_dry_run.network = {"network":"Testnet3", "blockchain":"Bitcoin"};
+    transfer_dry_run.network = {"network":"Testnet7", "blockchain":"Ravencoin"};
     currency = {"symbol":"tRVN", "decimals":8};
 
     // We set the max_fee_amount to know how much buffer we should
     // leave for fee payment when selecting a sender account.
-    dust_amount = "600";
-    max_fee_amount = "1200";
+    dust_amount =      "600000";
+    max_fee_amount =   "1200000";
     send_buffer = {{dust_amount}} + {{max_fee_amount}};
 
     // We look for a coin of value >= the reserved_amount to create
     // a transfer with change (reserved_amount is max_fee_amount + dust_amount x 2).
-    reserved_amount = "2400";
+    reserved_amount = "2400000";
     sender = find_balance({
       "minimum_balance":{
         "value": {{reserved_amount}},
@@ -165,13 +171,13 @@ transfer(10){
 
 return_funds(10){
   transfer_dry_run{
-    transfer_dry_run.network = {"network":"Testnet3", "blockchain":"Bitcoin"};
+    transfer_dry_run.network = {"network":"Testnet7", "blockchain":"Ravencoin"};
     currency = {"symbol":"tRVN", "decimals":8};
 
     // We look for a sender that is able to pay the 
     // max_fee_amount + min_utxo size (reserved_amount is max_fee_amount + min_utxo size).
-    max_fee_amount = "1200";
-    reserved_amount = "1800";
+    max_fee_amount  =   "1200000";
+    reserved_amount =   "1800000";
     sender = find_balance({
       "minimum_balance":{
         "value": {{reserved_amount}},
@@ -192,7 +198,7 @@ return_funds(10){
     recipient = {"address": {{recipient_address}}};
 
     sender_amount = 0 - {{sender.balance.value}};
-    transfer_dry_run.confirmation_depth = "1";
+    transfer_dry_run.confirmation_depth = "2";
     transfer_dry_run.dry_run = true;
     transfer_dry_run.operations = [
       {
@@ -221,7 +227,7 @@ return_funds(10){
     // We calculate the recipient_amount using the new suggested_fee
     // and assert that it is above the minimum UTXO size.
     recipient_amount = {{sender.balance.value}} - {{suggested_fee.value}};
-    dust_amount = "600";
+    dust_amount = "600000";
     recipient_minus_dust = {{recipient_amount}} - {{dust_amount}};
     assert({{recipient_minus_dust}});
 
@@ -239,7 +245,7 @@ return_funds(10){
         "operation_identifier":{"index":1},
         "type":"OUTPUT",
         "account":{{recipient}},
-        "amount":{"value":{{recipient_amount}},"currency":{{currency}}}
+        "amount":{"value":{{recipient_minus_dust}},"currency":{{currency}}}
       }
     ];
   }

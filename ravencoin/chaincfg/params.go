@@ -6,13 +6,13 @@ package chaincfg
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
-	"fmt"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcd/chaincfg/chainhash" //this import is safe, just generic hash utils.
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/chaincfg/chainhash" //this import is safe, just generic hash utils.
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/wire"
 )
 
 // These variables are the chain proof-of-work limit parameters for each default
@@ -210,7 +210,6 @@ type Params struct {
 	HDCoinType uint32
 }
 
-
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
 // the main network, regression test network, and test network (version 3).
 var genesisCoinbaseTx = wire.MsgTx{
@@ -269,7 +268,7 @@ var genesisBlock = wire.MsgBlock{
 	Header: wire.BlockHeader{
 		Version:    1,
 		PrevBlock:  chainhash.Hash{},         // 0000000000000000000000000000000000000000000000000000000000000000
-		MerkleRoot: *genesisMerkleRoot,        // 28ff00a867739a352523808d301f504bc4547699398d70faf2266a8bae5f3516
+		MerkleRoot: *genesisMerkleRoot,       // 28ff00a867739a352523808d301f504bc4547699398d70faf2266a8bae5f3516
 		Timestamp:  time.Unix(1537466400, 0), // Thursday, September 20, 2018 12:00:00 PM GMT-06:00
 		Bits:       0x1e00ffff,               // 503382015 [00000000ffff0000000000000000000000000000000000000000000000000000]
 		Nonce:      0x18aea41a,               // 414098458
@@ -291,11 +290,11 @@ var testNet7GenesisMerkleRoot = genesisMerkleRoot
 var testNet7GenesisBlock = wire.MsgBlock{
 	Header: wire.BlockHeader{
 		Version:    1,
-		PrevBlock:  chainhash.Hash{},          // 0000000000000000000000000000000000000000000000000000000000000000
+		PrevBlock:  chainhash.Hash{},           // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: *testNet7GenesisMerkleRoot, // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
-		Timestamp:  time.Unix(1296688602, 0),  // 2011-02-02 23:16:42 +0000 UTC
-		Bits:       0x1d00ffff,                // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
-		Nonce:      0x00ee4788,                // 15615880
+		Timestamp:  time.Unix(1296688602, 0),   // 2011-02-02 23:16:42 +0000 UTC
+		Bits:       0x1d00ffff,                 // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
+		Nonce:      0x00ee4788,                 // 15615880
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
@@ -321,42 +320,15 @@ var MainNetParams = Params{
 	BIP0066Height:            363725, // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
 	CoinbaseMaturity:         100,
 	SubsidyReductionInterval: 2100000,
-	TargetTimespan:           2016 * 60,           // 1.4 days
-	TargetTimePerBlock:       time.Minute * 1,     // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	TargetTimespan:           2016 * 60,       // 1.4 days
+	TargetTimePerBlock:       time.Minute * 1, // 10 minutes
+	RetargetAdjustmentFactor: 4,               // 25% less, 400% more
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0,
 	GenerateSupported:        false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
-		/*
-		{11111, newHashFromStr("000000015f81fd7b727a4e7ca4410e70784ed1ecc49d7332cf8eab3593fcfde9")},
-		{33333, newHashFromStr("0000000017684c9dd8c88e51d683a51d9c6cdc0569de4741b3687c0655aee59b")},
-		{74000, newHashFromStr("00000000002b8f18c373bfb5e12a18aede8dc559bcd17da4a4131c54f119d8f8")},
-		{105000, newHashFromStr("0000000000037dee96dd707d9b60f29eeefd1292664fbd1ced11b8a89131eee6")},
-		{134444, newHashFromStr("0000000000045dc79aadfa1fb1718c31be5718d3115e7f70b1b305dd6adc22eb")},
-		{168000, newHashFromStr("000000000001577c9675107249ac28896d44efb20d940a1ee9df24d668a3271b")},
-		{193000, newHashFromStr("00000000000387af2b7dc09b109d17bdfca8442aa6d9dcc3b86c48b69b0c94bd")},
-		{210000, newHashFromStr("0000000000001c450747d871473d55cb93be8368b5c875020d32e8d3f2185986")},
-		{216116, newHashFromStr("0000000000017b31084c5319b213956cf8593db2d0a17ebf8255739ee13158a7")},
-		{225430, newHashFromStr("0000000000021c32b16a2aa5b35f624b5efad2134daf2739b54d73c0264ed98f")},
-		{250000, newHashFromStr("000000000001b1df53194709b941142b4d58df11d0680373ae542063a6c2a12f")},
-		{267300, newHashFromStr("000000000000410b992bee3ee950514f8288d27524a9fb02368eaef014248f66")},
-		{279000, newHashFromStr("00000000000329c01f8b642d271b455b35fc8396a38b048988017d9a9dabc2b5")},
-		{300255, newHashFromStr("00000000000170a0f2dbaef516c190b81256d649e347553ca6170fa2da188cbb")},
-		{319400, newHashFromStr("000000000003611c67cf6f3db5a106e3af732d65e27cc3db3252ad36588ac9d9")},
-		{343185, newHashFromStr("000000000001a6350c521ee44786e7f4eb6ba4cca6de480c5072f78d84b8d7cf")},
-		{352940, newHashFromStr("000000000000c3f3a3d536367836dc0a337c83e3c30ee48aeb50c4db13f8bc78")},
-		{382320, newHashFromStr("000000000001210bef7a1bbc8ea823b17902981d83be29023cf81d81c0a0495a")},
-		{400000, newHashFromStr("0000000000006a4752802976fd71b7defc2ce2eea642c375c52f854810f97fea")},
-		{430000, newHashFromStr("00000000000090628f6d0adbe8b441fc82162aa93b51e680c677c13b825ebbba")},
-		{460000, newHashFromStr("000000000000571b1545e64c06ebb812f00911136202212aef7e86ae8e7089e9")},
-		{490000, newHashFromStr("000000000000a7cff76b6aeaed642f5048e95ad2d9c8953f3641b763f732e403")},
-		{520000, newHashFromStr("00000000000100323a5d84122dac56a396caa336463d9bee929b9bf3f5df0fa8")},
-		{550000, newHashFromStr("000000000000b78ca460d3bebe6d8ce4773157bf4dfdfdf4cdc8b459c1d9e53b")},
-		{560000, newHashFromStr("000000000001284595dd1297f389a1831bf5e669fd62f4ea4a8e0427b24ed83e")},
-		*/
 		{535721, newHashFromStr("000000000001217f58a594ca742c8635ecaaaf695d1a63f6ab06979f1c159e04")},
 		{697376, newHashFromStr("000000000000499bf4ebbe61541b02e4692b33defc7109d8f12d2825d4d2dfa0")},
 		{740000, newHashFromStr("00000000000027d11bf1e7a3b57d3c89acc1722f39d6e08f23ac3a07e16e3172")},
@@ -409,11 +381,11 @@ var MainNetParams = Params{
 
 	// Human-readable part for Bech32 encoded segwit addresses, as defined in
 	// BIP 173.
-	Bech32HRPSegwit: "bc", // always bc for main net
+	Bech32HRPSegwit: "rc", // always bc for main net
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x00, // starts with 1
-	ScriptHashAddrID:        0x05, // starts with 3
+	PubKeyHashAddrID:        0x3c, // starts with R
+	ScriptHashAddrID:        0x7a, // starts with 3
 	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
 	WitnessPubKeyHashAddrID: 0x06, // starts with p2
 	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
@@ -425,8 +397,6 @@ var MainNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 175,
-
-	
 }
 
 // TestNet7Params defines the network parameters for the test Ravencoin network
@@ -686,7 +656,6 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 	return hash
 }
 
-
 // RavencoinNet represents which ravencoin network a message belongs to.
 type RavencoinNet uint32
 
@@ -723,4 +692,3 @@ func init() {
 	mustRegister(&MainNetParams)
 	mustRegister(&TestNet7Params)
 }
-

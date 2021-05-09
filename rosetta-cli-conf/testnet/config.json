@@ -1,7 +1,7 @@
 {
   "network": {
     "blockchain": "Ravencoin",
-    "network": "Testnet3"
+    "network": "Testnet7"
   },
   "data_directory": "cli-data",
   "http_timeout": 300,

@@ -19,10 +19,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcutil"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/chaincfg"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/chaincfg/chainhash"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin/txscript"
+	"github.com/RavenProject/rosetta-ravencoin/ravenutil"
 	"github.com/coinbase/rosetta-sdk-go/types"
 )
 
@@ -54,7 +54,7 @@ func ParseCoinIdentifier(coinIdentifier *types.CoinIdentifier) (*chainhash.Hash,
 func ParseSingleAddress(
 	chainParams *chaincfg.Params,
 	script []byte,
-) (txscript.ScriptClass, btcutil.Address, error) {
+) (txscript.ScriptClass, ravenutil.Address, error) {
 	class, addresses, nRequired, err := txscript.ExtractPkScriptAddrs(script, chainParams)
 	if err != nil {
 		return 0, nil, fmt.Errorf("%w unable to extract script addresses", err)

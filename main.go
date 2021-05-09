@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -24,9 +25,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
 	"github.com/RavenProject/rosetta-ravencoin/configuration"
 	"github.com/RavenProject/rosetta-ravencoin/indexer"
+	"github.com/RavenProject/rosetta-ravencoin/ravencoin"
 	"github.com/RavenProject/rosetta-ravencoin/services"
 	"github.com/RavenProject/rosetta-ravencoin/utils"
 
@@ -55,6 +56,7 @@ const (
 
 var (
 	signalReceived = false
+	disablePruning = false
 )
 
 // handleSignals handles OS signals so we can ensure we close database
@@ -104,14 +106,21 @@ func startOnlineDependencies(
 		return i.Sync(ctx)
 	})
 
-	g.Go(func() error {
-		return i.Prune(ctx)
-	})
-
+	if !disablePruning {
+		g.Go(func() error {
+			return i.Prune(ctx)
+		})
+	}
 	return client, i, nil
 }
 
 func main() {
+	disablePruningFlag := flag.Bool("disable-pruning", false, "disable block pruning, default: false")
+	flag.Parse()
+	if *disablePruningFlag {
+		disablePruning = true
+	}
+
 	loggerRaw, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("can't initialize zap logger: %v", err)

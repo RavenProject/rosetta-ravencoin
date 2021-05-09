@@ -183,6 +183,13 @@ var (
 		Code:    18, //nolint
 		Message: "Unable to get balance",
 	}
+
+	// ErrCouldNotGetBestBlock is returned when the fetch
+	// to get the best block heigth.
+	ErrCouldNotGetBestBlock = &types.Error{
+		Code:    19, // nolint
+		Message: "Could not get best block height",
+	}
 )
 
 // wrapErr adds details to the types.Error provided. We use a function

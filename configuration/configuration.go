@@ -45,7 +45,7 @@ const (
 	// Mainnet is the Ravencoin Mainnet.
 	Mainnet string = "MAINNET"
 
-	// Testnet is Ravencoin Testnet3.
+	// Testnet is Ravencoin Testnet7.
 	Testnet string = "TESTNET"
 
 	// mainnetConfigPath is the path of the Ravencoin

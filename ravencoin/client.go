@@ -25,10 +25,10 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-	
+
+	"github.com/RavenProject/rosetta-ravencoin/ravenutil"
 	bitcoinUtils "github.com/coinbase/rosetta-bitcoin/utils"
-	
-	"github.com/btcsuite/btcutil"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/coinbase/rosetta-sdk-go/utils"
 )
@@ -270,8 +270,8 @@ func (b *Client) SendRawTransaction(
 ) (string, error) {
 	// Parameters:
 	//   1. hextring
-	//   2. maxfeerate (0 means accept any fee)
-	params := []interface{}{serializedTx, 0}
+	//   2. allowhighfees
+	params := []interface{}{serializedTx, false}
 
 	response := &sendRawTransactionResponse{}
 	if err := b.post(ctx, requestMethodSendRawTransaction, params, response); err != nil {
@@ -385,6 +385,19 @@ func (b *Client) getBlockchainInfo(
 	return response.Result, nil
 }
 
+// GetBestBlock performs the `getbestblock` JSON-RPC request
+func (b *Client) GetBestBlock(
+	ctx context.Context,
+) (int64, error) {
+	params := []interface{}{}
+	response := &blockchainInfoResponse{}
+	if err := b.post(ctx, requestMethodGetBlockchainInfo, params, response); err != nil {
+		return 0, fmt.Errorf("%w: unbale to get blockchain info", err)
+	}
+
+	return response.Result.Blocks, nil
+}
+
 // getBlockHash returns the hash for a specified block identifier.
 // If the identifier includes a hash it will return that hash.
 // If the identifier only includes an index, if will fetch the hash that corresponds to
@@ -407,7 +420,7 @@ func (b *Client) getBlockHash(
 		return *identifier.Hash, nil
 	}
 
-	return b.getHashFromIndex(ctx, *identifier.Index)
+	return b.GetHashFromIndex(ctx, *identifier.Index)
 }
 
 // parseBlock returns a *types.Block from a Block
@@ -445,10 +458,10 @@ func (b *Client) parseBlockData(block *Block) (*types.Block, error) {
 	}, nil
 }
 
-// getHashFromIndex performs the `getblockhash` JSON-RPC request for the specified
+// GetHashFromIndex performs the `getblockhash` JSON-RPC request for the specified
 // block index, and returns the hash.
 // https://bitcoin.org/en/developer-reference#getblockhash
-func (b *Client) getHashFromIndex(
+func (b *Client) GetHashFromIndex(
 	ctx context.Context,
 	index int64,
 ) (string, error) {
@@ -742,7 +755,7 @@ func (b *Client) parseInputTransactionOperation(
 // parseAmount returns the atomic value of the specified amount.
 // https://godoc.org/github.com/btcsuite/btcutil#NewAmount
 func (b *Client) parseAmount(amount float64) (uint64, error) {
-	atomicAmount, err := btcutil.NewAmount(amount)
+	atomicAmount, err := ravenutil.NewAmount(amount)
 	if err != nil {
 		return uint64(0), fmt.Errorf("%w: error parsing amount", err)
 	}
